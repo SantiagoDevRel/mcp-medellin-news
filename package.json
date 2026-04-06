@@ -1,0 +1,30 @@
+{
+  "name": "mcp-practice",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "server": "node dist/server/index.js",
+    "client": "node dist/client/index.js",
+    "host": "node dist/host/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SantiagoDevRel/mcp-testing.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/SantiagoDevRel/mcp-testing/issues"
+  },
+  "homepage": "https://github.com/SantiagoDevRel/mcp-testing#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@types/node": "^25.5.2",
+    "rss-parser": "^3.13.0",
+    "typescript": "^6.0.2"
+  }
+}

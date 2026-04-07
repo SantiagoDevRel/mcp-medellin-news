@@ -4,3 +4,5 @@ dist/
 .env.local
 *.key
 *.pem
+playground/node_modules/
+playground/dist/

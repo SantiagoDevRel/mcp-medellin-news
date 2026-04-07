@@ -27,7 +27,7 @@ server.tool(
     source_id: z.string().optional().describe(
       'Source ID to fetch from. If omitted, fetches from all sources. ' +
       'Available: telemedellin, eltiempo_medellin, minuto30, ' +
-      'vivir_poblado, elmundo_medellin, google_news_medellin'
+      'vivir_poblado, centropolis, google_news_medellin'
     ),
     limit: z.number().optional().default(10).describe(
       'Number of articles to return per source (max 20)'

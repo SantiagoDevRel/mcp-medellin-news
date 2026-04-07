@@ -49,13 +49,13 @@ export const RSS_SOURCES: RSSSource[] = [
     category: 'local'
   },
   {
-    id: 'elmundo_medellin',
-    name: 'El Mundo Medellín',
-    url: 'http://www.elmundo.com/portal/servicios/rss/',
+    id: 'centropolis',
+    name: 'Centrópolis Medellín',
+    url: 'https://www.centropolismedellin.com/feed',
     type: 'rss',
-    description: 'Diario local de circulación en Antioquia',
+    description: 'Periódico alternativo local del centro de Medellín',
     language: 'es',
-    category: 'general'
+    category: 'local'
   },
   {
     id: 'google_news_medellin',

@@ -1,19 +1,20 @@
 // Main playground app - dark-theme UI for testing MCP tools
-// NOTE: In production, tool calls would go through an MCP client proxy.
-// For this playground, we simulate by calling RSS sources directly using
-// the same URLs from sources.ts, since the MCP server uses stdio transport.
+// Calls the local Express proxy server (port 3333) to avoid CORS issues.
+// The proxy fetches RSS feeds and SIATA data server-side.
 
 import { useState } from 'react'
 import ToolCard from './components/ToolCard'
 import ResultViewer from './components/ResultViewer'
 
+const PROXY_URL = 'http://localhost:3333'
+
 const RSS_SOURCES = [
-  { id: 'telemedellin', name: 'Telemedellín', url: 'https://telemedellin.tv/feed/' },
-  { id: 'eltiempo_medellin', name: 'El Tiempo Medellín', url: 'https://www.eltiempo.com/rss/colombia_medellin.xml' },
-  { id: 'minuto30', name: 'Minuto30', url: 'https://www.minuto30.com/feed' },
-  { id: 'vivir_poblado', name: 'Vivir en El Poblado', url: 'https://www.vivirenelpoblado.com/feed' },
-  { id: 'elmundo_medellin', name: 'El Mundo Medellín', url: 'http://www.elmundo.com/portal/servicios/rss/' },
-  { id: 'google_news_medellin', name: 'Google News Medellín', url: 'https://news.google.com/rss/search?q=medell%C3%ADn+colombia&hl=es-419&gl=CO&ceid=CO:es-419' },
+  { id: 'telemedellin', name: 'Telemedellín' },
+  { id: 'eltiempo_medellin', name: 'El Tiempo Medellín' },
+  { id: 'minuto30', name: 'Minuto30' },
+  { id: 'vivir_poblado', name: 'Vivir en El Poblado' },
+  { id: 'centropolis', name: 'Centrópolis Medellín' },
+  { id: 'google_news_medellin', name: 'Google News Medellín' },
 ]
 
 const TOOLS = [
@@ -27,28 +28,6 @@ const TELEGRAM_CHANNELS = [
   { value: 'chismefrescomedallo', label: 'Chisme Fresco Medellín' },
   { value: 'denunciasantioqu', label: 'Denuncias Antioquia' },
 ]
-
-// Simple XML parser to extract items from RSS feed
-function parseRSSXml(xml: string, sourceName: string) {
-  const items: any[] = []
-  const itemRegex = /<item>([\s\S]*?)<\/item>/gi
-  let match
-  while ((match = itemRegex.exec(xml)) !== null) {
-    const itemXml = match[1]
-    const getTag = (tag: string) => {
-      const tagMatch = itemXml.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>|<${tag}[^>]*>([\\s\\S]*?)</${tag}>`))
-      return tagMatch ? (tagMatch[1] || tagMatch[2] || '').trim() : ''
-    }
-    items.push({
-      title: getTag('title'),
-      url: getTag('link'),
-      source: sourceName,
-      publishedAt: getTag('pubDate') || new Date().toISOString(),
-      description: getTag('description').replace(/<[^>]*>/g, '').substring(0, 200),
-    })
-  }
-  return items
-}
 
 export default function App() {
   const [selectedTool, setSelectedTool] = useState('fetch_news')
@@ -69,80 +48,30 @@ export default function App() {
     setResult(null)
 
     try {
-      if (selectedTool === 'list_sources') {
-        setResult({
-          rss: RSS_SOURCES.map(s => ({ ...s, type: 'rss' })),
-          telegram: TELEGRAM_CHANNELS.map(c => ({ id: c.value, channel: c.value, name: c.label })),
-          other: [{ id: 'siata', name: 'SIATA', type: 'api', description: 'Air quality and weather alerts' }],
-        })
-        setLoading(false)
-        return
-      }
-
-      if (selectedTool === 'fetch_telegram') {
+      if (selectedTool === 'fetch_news') {
+        const res = await fetch(`${PROXY_URL}/api/news?source_id=${sourceId}&limit=${limit}`)
+        if (!res.ok) throw new Error(`Proxy returned ${res.status}`)
+        const data = await res.json()
+        setResult(data)
+      } else if (selectedTool === 'fetch_air_quality') {
+        const res = await fetch(`${PROXY_URL}/api/air-quality`)
+        if (!res.ok) throw new Error(`Proxy returned ${res.status}`)
+        const data = await res.json()
+        setResult(data)
+      } else if (selectedTool === 'list_sources') {
+        const res = await fetch(`${PROXY_URL}/api/sources`)
+        if (!res.ok) throw new Error(`Proxy returned ${res.status}`)
+        const data = await res.json()
+        setResult(data)
+      } else if (selectedTool === 'fetch_telegram') {
         setResult({
           success: false,
           data: null,
-          error: 'Telegram requires a bot token. Set TELEGRAM_BOT_TOKEN in the MCP server environment.',
+          error: 'Requires TELEGRAM_BOT_TOKEN - configure in .env to enable',
           fetchedAt: new Date().toISOString(),
           source: channel,
         })
-        setLoading(false)
-        return
       }
-
-      if (selectedTool === 'fetch_air_quality') {
-        try {
-          const res = await fetch(
-            'https://siata.gov.co/EntregaData1/index.php/calidad_aire/calidadAireRedSIATA'
-          )
-          const data = await res.json()
-          const alerts = Array.isArray(data)
-            ? data.map((s: any) => {
-                const pm25 = parseFloat(s.pm25 || s.PM25 || '0')
-                return {
-                  station: s.nombre || s.station || 'Unknown',
-                  parameter: 'PM2.5',
-                  value: pm25,
-                  unit: 'ug/m3',
-                  timestamp: s.fecha || new Date().toISOString(),
-                  level: pm25 < 12 ? 'good' : pm25 < 35 ? 'moderate' : pm25 < 55 ? 'unhealthy' : 'hazardous',
-                }
-              })
-            : []
-          setResult({ success: true, data: alerts, fetchedAt: new Date().toISOString(), source: 'SIATA' })
-        } catch (e: any) {
-          setResult({
-            success: false,
-            data: null,
-            error: `SIATA fetch failed: ${e.message}`,
-            fetchedAt: new Date().toISOString(),
-            source: 'SIATA',
-          })
-        }
-        setLoading(false)
-        return
-      }
-
-      // fetch_news: use a CORS proxy approach - fetch RSS XML via allorigins
-      const sources = sourceId === 'all' ? RSS_SOURCES : RSS_SOURCES.filter(s => s.id === sourceId)
-      const safeLimit = Math.min(limit, 20)
-
-      const results = await Promise.all(
-        sources.map(async (source) => {
-          try {
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(source.url)}`
-            const res = await fetch(proxyUrl)
-            const text = await res.text()
-            const articles = parseRSSXml(text, source.name).slice(0, safeLimit)
-            return { success: true, data: articles, fetchedAt: new Date().toISOString(), source: source.name }
-          } catch (e: any) {
-            return { success: false, data: null, error: e.message, fetchedAt: new Date().toISOString(), source: source.name }
-          }
-        })
-      )
-
-      setResult(sourceId === 'all' ? results : results[0])
     } catch (e: any) {
       setError(e.message || 'Unknown error')
     }
